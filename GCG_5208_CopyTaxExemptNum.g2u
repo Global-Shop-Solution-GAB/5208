@@ -1,0 +1,49 @@
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+'Author: Bix
+'Date: 7/20/2018
+'Load King
+'GCG_5208_CopyTaxExemptNum.g2u
+'This project will copy the tax exempt number from the Customer Master Taxes screen to the Add'l Addresses Taxes when they are created
+'V_CUSTOMER_TAX.TAX_SALES_EX_NO -> OE_MULTI_SHIP.SHIP_TAX_E_NO
+'Screen, CUSTOMER = V.Passed.000001 : CUST_SHIP_ID = V.Passed.000003
+V.Local..BulkDeclareString(sError,sCust,sShipID)
+F.Intrinsic.Control.Try
+
+F.Intrinsic.Control.If(V.Caller.Hook,=,14443)
+	'Post Save hook for the Add New Customer Ship To ID Screen
+	V.Local.sCust.Set(V.Passed.000001)
+	V.Local.sShipID.Set(V.Passed.000003)
+	F.Intrinsic.Control.CallSub(SetTaxExemptNo,"sCust",V.Local.sCust,"sShipID",V.Local.sShipID)
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.End
+F.Intrinsic.Control.EndTry
+Program.Sub.Main.End
+
+Program.Sub.SetTaxExemptNo.Start
+'Queries DB to get Customer Tax Exempt Number and then writes it to DB for the Customer's new Add'l Ship To ID
+V.Local..BulkDeclareString(sError,sSQL,sRet)
+F.Intrinsic.Control.Try
+
+F.ODBC.Connection!con.OpenCompanyConnection
+F.Intrinsic.String.Build("select TAX_SALES_EX_NO from V_CUSTOMER_TAX where CUST = '{0}';",V.Args.sCust,V.Local.sSQL)
+F.ODBC.Connection!con.ExecuteAndReturn(V.Local.sSQL,V.Local.sRet)
+F.Intrinsic.Control.If(V.Ambient.ExecuteAndReturnEOF,=,False)
+	'Checking to see that sRet returned with something
+	F.Intrinsic.String.Build("update OE_MULTI_SHIP set SHIP_TAX_E_NO = '{0}' where CUSTOMER = '{1}' and SHIP_SEQ = '{2}';",V.Local.sRet.Trim,V.Args.sCust,V.Args.sShipID,V.Local.sSQL)
+	F.ODBC.Connection!con.Execute(V.Local.sSQL)
+F.Intrinsic.Control.EndIf
+F.ODBC.Connection!con.Close
+
+F.Intrinsic.Control.Catch
+	F.Intrinsic.String.Build("Project: {0}{1}{1}Subroutine: {2}{1}Error Occurred {3} with description {4}{1}{1}GAB Version: {5}",V.Ambient.ScriptPath,V.Ambient.Newline,V.Ambient.CurrentSubroutine,V.Ambient.ErrorNumber,V.Ambient.ErrorDescription,V.Ambient.GABVersion,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.End
+F.Intrinsic.Control.EndTry
+Program.Sub.SetTaxExemptNo.End
